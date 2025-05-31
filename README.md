@@ -10,45 +10,8 @@ Responsive React frontend UI
 Scan history (local browser storage)
 No external API needed – all analysis is done locally
 
-Project Structure
 
-graphql
-Copy
-Edit
-Phishnet-CSAY/
-├── dist/                      # Production build output (auto-generated)
-├── node_modules/              # Dependencies (auto-generated)
-├── src/
-│   ├── components/            # Reusable UI components
-│   │   ├── AuthPage.tsx
-│   │   ├── MyReports.tsx
-│   │   ├── ReportPhishing.tsx
-│   │   ├── SecurityGuide.tsx
-│   │   ├── SecurityQuiz.tsx
-│   │   ├── ThemeToggle.tsx
-│   │   ├── ThreatDashboard.tsx
-│   │   ├── TrackReport.tsx
-│   │   └── URLScanner.tsx     # ⚠️ Main component for scanning URLs
-│   ├── App.tsx                # Root component
-│   ├── index.css              # Global styles
-│   ├── main.tsx               # Entry point
-│   ├── mockData.ts            # Sample/mock data for testing
-│   ├── supabaseClient.ts      # Supabase config if used for backend
-│   ├── types.ts               # TypeScript type definitions
-│   └── vite-env.d.ts          # Vite environment type declarations
-├── .gitignore
-├── index.html                 # HTML template used by Vite
-├── package.json
-├── package-lock.json
-├── tailwind.config.js        # Tailwind theme configuration
-├── vite.config.ts            # Vite config file
-├── tsconfig.json             # TypeScript compiler options
-├── tsconfig.app.json
-├── tsconfig.node.json
-├── eslint.config.js          # Linting rules
-├── postcss.config.js         # PostCSS plugins
-
- How It Works
+How It Works
 User Inputs a URL in the frontend.
 
 Frontend calls /api/check-url on the Flask backend.
