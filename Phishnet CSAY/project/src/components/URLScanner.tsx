@@ -1,38 +1,50 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Shield, AlertTriangle, CheckCircle, XCircle, History, Trash2 } from 'lucide-react';
-import { mockScanResults } from '../mockData';
-import { RiskLevel, ScanResult, ScanHistory } from '../types';
+"use client";
 
-const riskLevelStyles: Record<RiskLevel, { bg: string; text: string; icon: React.ReactNode; border: string }> = {
+import React, { useState, useEffect } from "react";
+import {
+  Search,
+  Shield,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  History,
+  Trash2,
+} from "lucide-react";
+import { RiskLevel, ScanResult, ScanHistory } from "../types";
+
+const riskLevelStyles: Record<
+  RiskLevel,
+  { bg: string; text: string; icon: React.ReactNode; border: string }
+> = {
   safe: {
-    bg: 'bg-green-50 dark:bg-green-900/20',
-    text: 'text-green-800 dark:text-green-300',
-    border: 'border-green-200 dark:border-green-800',
-    icon: <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+    bg: "bg-green-50 dark:bg-green-900/20",
+    text: "text-green-800 dark:text-green-300",
+    border: "border-green-200 dark:border-green-800",
+    icon: <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />,
   },
   suspicious: {
-    bg: 'bg-yellow-50 dark:bg-yellow-900/20',
-    text: 'text-yellow-800 dark:text-yellow-300',
-    border: 'border-yellow-200 dark:border-yellow-800',
-    icon: <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+    bg: "bg-yellow-50 dark:bg-yellow-900/20",
+    text: "text-yellow-800 dark:text-yellow-300",
+    border: "border-yellow-200 dark:border-yellow-800",
+    icon: <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />,
   },
   dangerous: {
-    bg: 'bg-red-50 dark:bg-red-900/20',
-    text: 'text-red-800 dark:text-red-300',
-    border: 'border-red-200 dark:border-red-800',
-    icon: <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-  }
+    bg: "bg-red-50 dark:bg-red-900/20",
+    text: "text-red-800 dark:text-red-300",
+    border: "border-red-200 dark:border-red-800",
+    icon: <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />,
+  },
 };
 
 export function URLScanner() {
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState("");
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<ScanHistory[]>([]);
 
   useEffect(() => {
-    const savedHistory = localStorage.getItem('scanHistory');
+    const savedHistory = localStorage.getItem("scanHistory");
     if (savedHistory) {
       setHistory(JSON.parse(savedHistory));
     }
@@ -41,91 +53,142 @@ export function URLScanner() {
   const saveToHistory = (scanResult: ScanResult) => {
     const historyEntry: ScanHistory = {
       ...scanResult,
-      id: crypto.randomUUID()
+      id: crypto.randomUUID(),
     };
-    const updatedHistory = [historyEntry, ...history].slice(0, 10); // Keep last 10 scans
+    const updatedHistory = [historyEntry, ...history].slice(0, 10);
     setHistory(updatedHistory);
-    localStorage.setItem('scanHistory', JSON.stringify(updatedHistory));
+    localStorage.setItem("scanHistory", JSON.stringify(updatedHistory));
   };
 
   const clearHistory = () => {
     setHistory([]);
-    localStorage.removeItem('scanHistory');
+    localStorage.removeItem("scanHistory");
+  };
+
+  const checkURL = async (url: string): Promise<ScanResult> => {
+    try {
+      const res = await fetch("http://localhost:5000/api/check-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+
+      const data = await res.json();
+      const riskLevel = data.result.toLowerCase();
+
+      const scanResult: ScanResult = {
+        url,
+        riskLevel: riskLevel === "phishing" ? "dangerous" : "safe",
+        threats:
+          riskLevel === "phishing"
+            ? [
+                "Potential phishing attempt",
+                "ML model detected suspicious patterns",
+                "Domain flagged by risk rules",
+              ]
+            : [],
+        recommendations:
+          riskLevel === "phishing"
+            ? [
+                "Avoid clicking or sharing this link",
+                "Report the site to administrators",
+                "Run a malware scan if visited",
+              ]
+            : ["URL appears safe", "Always verify SSL and domain", "Use browser protections"],
+        timestamp: new Date().toISOString(),
+
+        // 🆕 Added new fields from API response
+        usedMLModel: data.usedMLModel,
+        isZeroDay: data.isZeroDay,
+        modelVersion: data.modelVersion,
+        detectionSource: data.detectionSource,
+        confidenceScore: data.confidenceScore,
+      };
+
+      return scanResult;
+    } catch (error) {
+      console.error("API failed, falling back to mock logic.", error);
+
+      const urlObj = new URL(url);
+      const domain = urlObj.hostname.toLowerCase();
+
+      const isSuspicious =
+        domain.includes("secure") ||
+        domain.includes("login") ||
+        domain.includes("account") ||
+        domain.includes("verify") ||
+        domain.includes("-") ||
+        domain.endsWith(".xyz") ||
+        domain.endsWith(".net");
+
+      const isDangerous =
+        domain.includes("0") ||
+        domain.includes("1") ||
+        domain.includes("security") ||
+        domain.includes("bank") ||
+        /[0-9]/.test(domain);
+
+      const fallbackResult: ScanResult = {
+        url,
+        riskLevel: isDangerous ? "dangerous" : isSuspicious ? "suspicious" : "safe",
+        threats: [],
+        recommendations: [],
+        timestamp: new Date().toISOString(),
+
+        // Provide default values for the new fields on fallback
+        usedMLModel: false,
+        isZeroDay: false,
+        modelVersion: "N/A",
+        detectionSource: "fallback",
+        confidenceScore: 0,
+      };
+
+      if (isDangerous) {
+        fallbackResult.threats = [
+          "Suspicious character substitution detected",
+          "Domain contains security-sensitive keywords",
+          "Potential phishing attempt",
+        ];
+        fallbackResult.recommendations = [
+          "Do not enter any personal information",
+          "Avoid accessing this website",
+          "Report to relevant authorities",
+        ];
+      } else if (isSuspicious) {
+        fallbackResult.threats = [
+          "Domain contains suspicious keywords",
+          "Unusual domain pattern detected",
+          "Limited domain history available",
+        ];
+        fallbackResult.recommendations = [
+          "Proceed with extreme caution",
+          "Verify the website's legitimacy",
+          "Do not enter sensitive information",
+        ];
+      } else {
+        fallbackResult.recommendations = [
+          "Website appears legitimate",
+          "Always verify SSL certificates",
+          "Monitor for unusual activity",
+        ];
+      }
+
+      return fallbackResult;
+    }
   };
 
   const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const exactMatch = mockScanResults[url];
-    if (exactMatch) {
-      setResult(exactMatch);
-      saveToHistory(exactMatch);
-      setLoading(false);
-      return;
+
+    try {
+      const scanResult = await checkURL(url);
+      setResult(scanResult);
+      saveToHistory(scanResult);
+    } catch (error) {
+      console.error("Scan failed", error);
     }
 
-    const urlObj = new URL(url);
-    const domain = urlObj.hostname.toLowerCase();
-
-    const isSuspicious = 
-      domain.includes('secure') ||
-      domain.includes('login') ||
-      domain.includes('account') ||
-      domain.includes('verify') ||
-      domain.includes('-') ||
-      domain.endsWith('.xyz') ||
-      domain.endsWith('.net');
-
-    const isDangerous =
-      domain.includes('0') ||
-      domain.includes('1') ||
-      domain.includes('security') ||
-      domain.includes('bank') ||
-      /[0-9]/.test(domain);
-
-    const result: ScanResult = {
-      url,
-      riskLevel: isDangerous ? 'dangerous' : isSuspicious ? 'suspicious' : 'safe',
-      threats: [],
-      timestamp: new Date().toISOString(),
-      recommendations: []
-    };
-
-    if (isDangerous) {
-      result.threats = [
-        'Suspicious character substitution detected',
-        'Domain contains security-sensitive keywords',
-        'Potential phishing attempt'
-      ];
-      result.recommendations = [
-        'Do not enter any personal information',
-        'Avoid accessing this website',
-        'Report to relevant authorities'
-      ];
-    } else if (isSuspicious) {
-      result.threats = [
-        'Domain contains suspicious keywords',
-        'Unusual domain pattern detected',
-        'Limited domain history available'
-      ];
-      result.recommendations = [
-        'Proceed with extreme caution',
-        'Verify the website\'s legitimacy',
-        'Do not enter sensitive information'
-      ];
-    } else {
-      result.recommendations = [
-        'Website appears legitimate',
-        'Always verify SSL certificates',
-        'Monitor for unusual activity'
-      ];
-    }
-
-    setResult(result);
-    saveToHistory(result);
     setLoading(false);
   };
 
@@ -178,7 +241,9 @@ export function URLScanner() {
 
       {result && (
         <div className="space-y-6 animate-fade-in">
-          <div className={`p-6 rounded-xl border ${riskLevelStyles[result.riskLevel].bg} ${riskLevelStyles[result.riskLevel].border}`}>
+          <div
+            className={`p-6 rounded-xl border ${riskLevelStyles[result.riskLevel].bg} ${riskLevelStyles[result.riskLevel].border}`}
+          >
             <div className="flex items-center gap-3 mb-3">
               {riskLevelStyles[result.riskLevel].icon}
               <h3 className={`font-semibold capitalize text-lg ${riskLevelStyles[result.riskLevel].text}`}>
@@ -219,6 +284,31 @@ export function URLScanner() {
               ))}
             </ul>
           </div>
+
+          {/* Display new data fields */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+            <h4 className="font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-purple-600" />
+              Additional Info
+            </h4>
+            <ul className="space-y-1 text-slate-700 dark:text-slate-300 text-sm font-mono">
+              <li>
+                <strong>Used ML Model:</strong> {result.usedMLModel ? "Yes" : "No"}
+              </li>
+              <li>
+                <strong>Zero-Day Detection:</strong> {result.isZeroDay ? "Yes" : "No"}
+              </li>
+              <li>
+                <strong>Model Version:</strong> {result.modelVersion}
+              </li>
+              <li>
+                <strong>Detection Source:</strong> {result.detectionSource}
+              </li>
+              <li>
+                <strong>Confidence Score:</strong> {result.confidenceScore}
+              </li>
+            </ul>
+          </div>
         </div>
       )}
 
@@ -229,7 +319,7 @@ export function URLScanner() {
             className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
           >
             <History className="w-5 h-5" />
-            {showHistory ? 'Hide History' : 'Show History'}
+            {showHistory ? "Hide History" : "Show History"}
           </button>
           {history.length > 0 && (
             <button
